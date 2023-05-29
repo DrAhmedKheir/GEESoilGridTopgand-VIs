@@ -1,0 +1,123 @@
+https://code.earthengine.google.com/54704d9713911984fe4b47564c1c664a
+
+var AOI = ee.FeatureCollection("users/Elnashar/Vector/NileDelta");
+
+////////////////////////////////////////////////////////////////////
+var f = require('users/Elnashar/FD:Functions');
+
+var AOI = AOI.geometry().buffer(10000);
+var region = AOI;
+
+// Add static variables indices
+function indices(image){
+  var GNDVI = image.normalizedDifference(['sur_refl_b02','sur_refl_b03']).rename('GNDVI');
+  var GCVI  = image.expression('(NIR/(B-1))', {'NIR':image.select('sur_refl_b02'), 'B':image.select('sur_refl_b03')}).rename('GCVI');
+  var WDRVI = image.expression('((0.1*NIR)-R)/((0.1*NIR)+R)', {'NIR':image.select('sur_refl_b02'), 'R':image.select('sur_refl_b01')}).rename('WDRVI');
+  return image.addBands([GNDVI, GCVI, WDRVI]);
+}
+
+// Export static variables
+function export_SV(x, region){
+
+  if (x !== 0){
+    var dd = '00';
+    var mm = '00';
+    var yy = '0000';
+    var ID = yy + mm + dd;
+
+    Export.image.toDrive({image:Ele, description:'Ele_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:Slo, description:'Slo_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:Asp, description:'Asp_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:Lon, description:'Lon_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:Lat, description:'Lat_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    
+    Export.image.toDrive({image:sand, description:'Sand_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:silt, description:'Silt_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:clay, description:'Clay_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:SOC, description:'SOC_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:OM, description:'OM_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:Tex, description:'Textur_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:pH, description:'pH_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+    Export.image.toDrive({image:rho, description:'Density_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'staticvariables'});
+  }
+}
+
+// Export monthly dynamic variables
+function export_MM(x, region){
+  
+  if (x !== 0){
+    for (var yy=Number(stDate.slice(0, 4)); yy<=Number(enDate.slice(0, 4)); yy++){
+      for (var mm=1; mm<=12; mm++){
+
+        var NDVI  = mmNDVI.filterMetadata('yy', 'equals', yy).filterMetadata('mm', 'equals', mm).first();
+        var EVI   = mmEVI.filterMetadata('yy', 'equals', yy).filterMetadata('mm', 'equals', mm).first();
+        var GNDVI = mmGNDVI.filterMetadata('yy', 'equals', yy).filterMetadata('mm', 'equals', mm).first();
+        var GCVI  = mmGCVI.filterMetadata('yy', 'equals', yy).filterMetadata('mm', 'equals', mm).first();
+        var WDRVI = mmWDRVI.filterMetadata('yy', 'equals', yy).filterMetadata('mm', 'equals', mm).first();
+      
+        var dd = '00';
+        mm = f.str2(mm, 2);
+        var ID = yy + mm + dd;
+        
+        // Export.image.toDrive({image:NDVI, description:'NDVI_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'dynamicVariables'});
+        // Export.image.toDrive({image:EVI,  description:'EVI_'+ID,  region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'dynamicVariables'});
+        // Export.image.toDrive({image:GNDVI, description:'GNDVI_'+ID,  region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'dynamicVariables'});
+        // Export.image.toDrive({image:GCVI,  description:'GCVI_'+ID,  region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'dynamicVariables'});
+        Export.image.toDrive({image:WDRVI, description:'WDRVI_'+ID, region:region, scale:Scale, crs:crs, maxPixels:1e13, folder:'dynamicVariables'});
+
+      }
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////
+var crs    = 'EPSG:4326';
+var Scale  = 231.91556871282302;
+var time   = ['2021-11-01', '2022-04-30'];
+var region = region;
+////////////////////////////////////////////////////////////////////
+// Start and end dates 
+var stDate = time[0];
+var enDate = time[1];
+////////////////////////////////////////////////////////////////////
+
+// MOD13Q1.061 Terra Vegetation Indices 16-Day Global 250m
+var MOD13Q1 = ee.ImageCollection('MODIS/061/MOD13Q1').filter(ee.Filter.date(stDate, enDate));
+var MOD13Q1 = MOD13Q1.map(indices);
+
+// MOD13Q1.061 Terra Vegetation Indices Monthly Global 250m
+var mmNDVI  = f.temporalAggregation(MOD13Q1.select(['NDVI']), 'MM', 'max', 'NDVI', 'NDVI', 'expression=(b*0.0001)<0?mask:(b*0.0001)', 'masked=None');
+var mmEVI   = f.temporalAggregation(MOD13Q1.select(['EVI']), 'MM', 'max', 'EVI', 'EVI', 'expression=(b*0.0001)<0?mask:(b*0.0001)', 'masked=None');
+var mmGNDVI = f.temporalAggregation(MOD13Q1.select(['GNDVI']), 'MM', 'max', 'GNDVI', 'GNDVI', 'expression=None', 'masked=None');
+var mmGCVI  = f.temporalAggregation(MOD13Q1.select(['GCVI']), 'MM', 'max', 'GCVI', 'GCVI', 'expression=None', 'masked=None');
+var mmWDRVI = f.temporalAggregation(MOD13Q1.select(['WDRVI']), 'MM', 'max', 'WDRVI', 'WDRVI', 'expression=None', 'masked=None');
+print(mmNDVI.first().projection().nominalScale());
+
+// Static variables
+var Ele = ee.Image('CGIAR/SRTM90_V4').select('elevation');
+var Slo = ee.Terrain.slope(Ele).clamp(0, 90);
+var Asp = ee.Terrain.aspect(Ele).clamp(0, 360);
+var PLL = ee.Image.pixelLonLat();
+
+Ele = Ele.reduceResolution({reducer:ee.Reducer.mean(), bestEffort:true}).reproject({crs:crs, scale:Scale}).rename('Ele');
+Slo = Slo.reduceResolution({reducer:ee.Reducer.mean(), bestEffort:true}).reproject({crs:crs, scale:Scale}).rename('Slo');
+Asp = Asp.reduceResolution({reducer:ee.Reducer.mean(), bestEffort:true}).reproject({crs:crs, scale:Scale}).rename('Asp');
+
+var Lon = PLL.select('longitude').reproject({crs:crs, scale:Scale}).rename('Lon');
+var Lat = PLL.select('latitude').reproject({crs:crs, scale:Scale}).rename('Lat');
+print(Ele.projection().nominalScale());
+
+var soilDepth = ['b0', 'b10', 'b30'];
+var sand = ee.Image("OpenLandMap/SOL/SOL_SAND-WFRACTION_USDA-3A1A1A_M/v02").select(soilDepth).reduce('mean').rename('Sand');
+var clay = ee.Image("OpenLandMap/SOL/SOL_CLAY-WFRACTION_USDA-3A1A1A_M/v02").select(soilDepth).reduce('mean').rename('Clay');
+var silt = ee.Image(100).subtract(sand.add(clay)).rename('Silt');
+var SOC  = ee.Image("OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02").select(soilDepth).reduce('mean').divide(2).rename('SOC');
+var OM   = SOC.multiply(1.72).rename('OM');
+var Tex  = ee.Image("OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02").select(soilDepth).reduce('mode').rename('Textur');
+var pH   = ee.Image("OpenLandMap/SOL/SOL_PH-H2O_USDA-4C1A2A_M/v02").select(soilDepth).reduce('mean').rename('pH');
+var rho  = ee.Image("OpenLandMap/SOL/SOL_BULKDENS-FINEEARTH_USDA-4A1H_M/v02").select(soilDepth).reduce('mean').rename('rho');
+print(sand.projection().nominalScale());
+////////////////////////////////////////////////////////////////////
+
+export_SV(1, region);
+export_MM(1, region);
